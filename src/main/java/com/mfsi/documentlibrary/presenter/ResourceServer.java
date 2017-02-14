@@ -71,6 +71,7 @@ public class ResourceServer implements ServiceConnection, RequestObserver.Reques
         /*this ensures that this runs just once in the lifetime of the object*/
         if (mRequesterService == null && mServerRequest != null) {
             mRequesterService = ((RequesterService.ServiceBinder) service).getService();
+            Log.i("==","=======================STARTDOWNLOAD==================");
             mRequesterService.downloadResource(mServerRequest, this);
         }
 
@@ -122,8 +123,9 @@ public class ResourceServer implements ServiceConnection, RequestObserver.Reques
 
     /**
      * retrieve the Resource
-     * @param resource AppResource instance
-     * @param context the calling Context
+     *
+     * @param resource    AppResource instance
+     * @param context     the calling Context
      * @param contentType the Content type of the AppResource to be downloaded.
      */
     private void getResource(AppResource resource, Context context, String contentType) {
@@ -133,6 +135,8 @@ public class ResourceServer implements ServiceConnection, RequestObserver.Reques
 
         /*test if it is already in Cache*/
         final Object object = mResourcesModel.getFromCache(resourceIdentifier);
+
+        Log.i("===","================================"+object);
 
         if (object == null) {
 
@@ -169,7 +173,9 @@ public class ResourceServer implements ServiceConnection, RequestObserver.Reques
     @Override
     public void requestCancelled(final ServerRequest serverRequest) {
 
-        RequesterService.unBindRequest(mContext, this);
+        if (mRequesterService != null) {
+            RequesterService.unBindRequest(mContext, this);
+        }
         mHandler.post(new Runnable() {
             @Override
             public void run() {
@@ -182,9 +188,10 @@ public class ResourceServer implements ServiceConnection, RequestObserver.Reques
                 }
             }
         });
+
     }
 
-    private void handleBitmapReqResponse(ServerResponse serverResponse){
+    private void handleBitmapReqResponse(ServerResponse serverResponse) {
 
         final String resUid = serverResponse.getUniqueIdentifier();
         ResProcessingDetails processingDetails = mResourceView.getResProcessingDetails(resUid);
@@ -192,10 +199,10 @@ public class ResourceServer implements ServiceConnection, RequestObserver.Reques
 
         WeakReference<Bitmap> result = null;
 
-        if(serverResponse.getResponseCode() == SyncConstants.HTTP_OK){
+        if (serverResponse.getResponseCode() == SyncConstants.HTTP_OK && processingDetails != null) {
             result = ImageProcessing.getBitmap(responseResult, (ImageRequiredType) processingDetails);
             if (processingDetails.requiresCache()) {
-                if (result!= null && result.get() != null) {
+                if (result != null && result.get() != null) {
                     mResourcesModel.addToCache(resUid, result.get());
                 }
             }
@@ -206,25 +213,27 @@ public class ResourceServer implements ServiceConnection, RequestObserver.Reques
             file.delete();
         }
 
-        final Bitmap responseBitmap = result!= null? result.get(): null;
+        final Bitmap responseBitmap = result != null ? result.get() : null;
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                mResourceView.setData(resUid, responseBitmap);
+                if (mResourceView != null) {
+                    mResourceView.setData(resUid, responseBitmap);
+                }
             }
         });
 
     }
 
-    private void handleJsonReqResponse(ServerResponse serverResponse){
+    private void handleJsonReqResponse(ServerResponse serverResponse) {
 
         final String resUid = serverResponse.getUniqueIdentifier();
         ResProcessingDetails processingDetails = mResourceView.getResProcessingDetails(resUid);
         String responseResult = serverResponse.getResponseResult();
 
-        Object data = serverResponse.isDiskDownloadRequested()?
-                JsonProcessing.getFileData(responseResult, (JsonRequiredType) processingDetails):
-                JsonProcessing.getData(responseResult,(JsonRequiredType) processingDetails);
+        Object data = serverResponse.isDiskDownloadRequested() ?
+                JsonProcessing.getFileData(responseResult, (JsonRequiredType) processingDetails) :
+                JsonProcessing.getData(responseResult, (JsonRequiredType) processingDetails);
 
         if (processingDetails.requiresCache()) {
             mResourcesModel.addToCache(resUid, data);
@@ -233,10 +242,8 @@ public class ResourceServer implements ServiceConnection, RequestObserver.Reques
     }
 
 
-
     @Override
     public void requestComplete(ServerResponse serverResponse) {
-
 
         if (serverResponse != null) {
             String type = serverResponse.getContentType();

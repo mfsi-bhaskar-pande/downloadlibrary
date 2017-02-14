@@ -9,6 +9,8 @@
 
         <service android:name=".dataSync.RequesterService"/>
 
+
+
     </application>
 
 </manifest>
